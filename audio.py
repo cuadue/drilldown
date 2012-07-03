@@ -25,28 +25,27 @@ f = 440
 
 t = numpy.linspace(0, 1, RATE  * 60 / BPM)
 
-class Renderer:
-    def __init__(self):
+class RingBuffer:
+    def __init__(self, buf):
         self.end = 0
-        self.buf = numpy.sin(PI2 * f * t)
+        self.buf = buf
 
-    def __call__(self, chunk):
-        if not chunk: return
-        start = self.end
-        end = (self.end + chunk) % len(self.buf)
-        self.end = end
+    def next_frames(self, frames):
         # Make a ring buffer
+        if not frames: return
+
+        start = self.end
+        end = (self.end + frames) % len(self.buf)
+        self.end = end
         if start > end:
             result = numpy.concatenate((self.buf[start:], self.buf[:end]))
         else:
             result = self.buf[start:end]
 
-        # If this fails, there's a fundamental math error above and you could
-        # damage your speakers, or ears
-        assert(len(result) == chunk)
+        assert(len(result) == frames)
         return result
 
-render_chunk = Renderer()
+sin_buf = RingBuffer(numpy.sin(PI2 * f * t))
 
 # Audio stream time
 p = pyaudio.PyAudio()
@@ -56,17 +55,15 @@ stream = p.open(format = pyaudio.paFloat32,
                  output = True,
                  frames_per_buffer = STREAM_BUF_SIZE)
 
-zeros = numpy.zeros(10000)
-stream.start_stream()
+#stream.start_stream()
 try:
     while True:
         # We want to keep the buffer full at all times to trade one kind of
         # latency for another: faster response from user to buffer, slower from
         # buffer to output
         
-        chunk = render_chunk(stream.get_write_available())
+        chunk = sin_buf.next_frames(stream.get_write_available())
         if chunk is not None:
-            print chunk
             stream.write(chunk.astype(numpy.float32).tostring(),
                          exception_on_underflow=True)
 
