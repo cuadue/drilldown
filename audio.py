@@ -1,4 +1,5 @@
 import threading
+import Queue
 import time
 import pyaudio
 import numpy
@@ -7,7 +8,6 @@ from copy import deepcopy
 STREAM_BUF_SIZE = 512
 CHANNELS = 1
 RATE = 44100
-BPM = 100
 PI = numpy.pi
 PI2 = 2 * PI
 
@@ -20,14 +20,21 @@ PI2 = 2 * PI
 # other than that you'll hear something that, even if it's not what you
 # desired, will be at least technically "correct".
 
+class Synthesizer:
+    def __init__(self, audio_server):
+        self._server = audio_server
+
+    def sine(self, freq, dur):
+        return numpy.sin(PI2 * freq * 
+                         numpy.linspace(0, dur * RATE, dur * RATE))
+
 class RingBuffer:
-    def __init__(self, buf):
-        self.end = 0
+    def __init__(self, buf, end):
+        self.end = end
         self.buf = buf
 
     def next_frames(self, frames):
-        # Make a ring buffer
-        if not frames: return
+        if frames is None: return
 
         start = self.end
         end = (self.end + frames) % len(self.buf)
@@ -45,21 +52,13 @@ class AudioServer(threading.Thread):
     def __init__(self, bpm):
         super(AudioServer, self).__init__()
         self.daemon = True
-        self.__buf = None
-        self.__buflock = threading.Lock()
-
-        self.t = numpy.linspace(0, 1, RATE  * 60 / BPM)
-
-    def oscillator(self, freq, vec_ang_fn=numpy.sin):
-        return vec_ang_fn(numpy.pi * 2 * self.t)
+        self.buf_queue = Queue.Queue()
 
     def write_buf(self, buf):
-        self.__buflock.acquire()
         b = numpy.zeros(len(buf))
-        b[:] = buf
-        self.__buf = RingBuffer(b)
-        self.__buflock.release()
-        
+        b[:] = buf # Make a deep copy of the input buffer
+        self.buf_queue.put(b)
+
     def run(self):
         p = pyaudio.PyAudio()
         stream = p.open(format = pyaudio.paFloat32,
@@ -68,20 +67,27 @@ class AudioServer(threading.Thread):
                         output = True,
                         frames_per_buffer = STREAM_BUF_SIZE)
         try:
+            __buf = None
             while True:
-                # We want to keep the buffer full at all times to trade one kind of
-                # latency for another: faster response from user to buffer,
-                # slower from buffer to output
-                
-                if self.__buf is None:
+                try:
+                    __buf = RingBuffer(self.buf_queue.get_nowait(), 
+                                       __buf.end if __buf else 0)
+                except Queue.Empty:
+                    pass
+
+                if __buf is None:
+                    time.sleep(0.001)
                     continue
 
-                chunk = self.__buf.next_frames(stream.get_write_available())
+                # We want to keep the buffer full at all times to trade one
+                # kind of latency for another: faster response from user to
+                # buffer, slower from buffer to output
+                chunk = __buf.next_frames(stream.get_write_available())
                 if chunk is not None:
-                    stream.write(chunk.astype(numpy.float32).tostring(),
-                                 exception_on_underflow=True)
+                    stream.write(chunk.astype(numpy.float32).tostring())
         finally:
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
+            pass
+            #stream.stop_stream()
+            #stream.close()
+            #p.terminate()
 
