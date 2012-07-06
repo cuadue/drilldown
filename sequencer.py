@@ -11,9 +11,8 @@ def first_bit_on(val):
     return result
 
 class SequencerPage:
-    def __init__(self, ncols, refbits=2):
-        self.refbits = refbits
-        self.state = [(-1, -1)] * ncols
+    def __init__(self, ncols):
+        self.state = [(0, 0)] * ncols
         self.cache = [None] * ncols
         self.buf = None
 
@@ -29,9 +28,12 @@ class SequencerPage:
         # Pick off the refbits'th least signficant bits 
         # The minus 1 is because the incoming value is 1-indexed, while
         # the arrays of references and instruments are 0-indexed.
-        refval = val & ~(~0 << self.refbits)
-        instrval = first_bit_on(val >> self.refbits)
+        # Internally store representations 0-indexed
+        refval = val & 0b111
+        instrval = (val & 0b111000) >> 3
         self.state[col] = (refval, instrval)
+
+        # BIG TODO
 
     def __put_chunk(self, col, chunk):
         if chunk is None: return
@@ -58,12 +60,11 @@ class SequencerPage:
         return None
 
     def render(self, force=False):
-        if self.buf is None or force:
-            self.buf = numpy.zeros(self.buflen)
+        self.buf = numpy.zeros(self.buflen)
 
-            for col, (refval, instrval) in enumerate(self.state):
-                self.__put_chunk(col, self.__render_ref(refval))
-                self.__put_chunk(col, self.__render_instr(instrval))
+        for col, (refval, instrval) in enumerate(self.state):
+            self.__put_chunk(col, self.__render_ref(refval - 1))
+            self.__put_chunk(col, self.__render_instr(instrval - 1))
 
         return self.buf
 
