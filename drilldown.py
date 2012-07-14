@@ -73,9 +73,16 @@ class Drilldown(monome.Monome):
 
 aserver = audio.AudioServer(BPM)
 aserver.start()
-synth = audio.Synthesizer(aserver)
-instruments = [synth.sine(f, 0.1) for f in 
-                                [400, 500, 737, 903, 1088, 1330, 1818, 2000]]
+
+instruments = [audio.load_sample('samples/' + p) for p in [
+    '78-BD1.aif',
+    '78-BHI1.aif',
+    '78-BLO1.aif',
+    '78-BME1.aif',
+    '78-CLA1.aif',
+    '78-COW1.aif',
+    '78-GUI1.aif'
+    ]]
 
 app = Drilldown(aserver, instruments, monome.find_any_monome())
 app.start()

@@ -1,14 +1,26 @@
 import numpy 
 
-def first_bit_on(val):
-    ''' This is kind of like a binary decoder and I know there must be a
-        better way, but my brain is broken right now and this works. '''
-    if val == 0:
-        return -1
-    result = 0
-    while (val >> result) & 1 == 0:
-        result += 1
-    return result
+smooth_start = numpy.linspace(0, 1, 10)
+smooth_end = numpy.linspace(1, 0, 10)
+
+def norm_smooth(buf):
+    ''' Normalizes the buffer to unity. Offsets to 0 RMS, and applies
+        a smoothing to the front and end of the buffer as a primitive
+        pop-supression '''
+
+    res = numpy.zeros_like(buf)
+    res[:] = buf - numpy.sqrt(numpy.mean(buf * buf))
+
+    scalar = max(numpy.max(res), -numpy.min(res))
+    if abs(scalar) < 1e-12:
+        return buf
+
+    print scalar
+
+    res /= scalar
+    res[0:10] *= smooth_start
+    res[-10:] *= smooth_end
+    return res
 
 class SequencerPage:
     def __init__(self, ncols):
@@ -30,7 +42,7 @@ class SequencerPage:
         # the arrays of references and instruments are 0-indexed.
         # Internally store representations 0-indexed
         refval = val & 0b111
-        instrval = (val & 0b111000) >> 3
+        instrval = val >> 3
         self.state[col] = (refval, instrval)
 
         # BIG TODO
@@ -43,7 +55,6 @@ class SequencerPage:
         overflow = start_frame + len(chunk) - len(self.buf)
         if overflow > 0:
             self.buf[start_frame: -1] += chunk[0: len(chunk) - overflow - 1]
-            self.buf[0: overflow - 1] += chunk[len(chunk) - overflow: -1]
         else:
             self.buf[start_frame:start_frame + len(chunk)] += chunk
 
@@ -66,5 +77,6 @@ class SequencerPage:
             self.__put_chunk(col, self.__render_ref(refval - 1))
             self.__put_chunk(col, self.__render_instr(instrval - 1))
 
+        self.buf = norm_smooth(self.buf)
         return self.buf
 

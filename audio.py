@@ -3,7 +3,8 @@ import Queue
 import time
 import pyaudio
 import numpy
-from copy import deepcopy
+import aifc
+import struct
 
 STREAM_BUF_SIZE = 512
 CHANNELS = 1
@@ -20,13 +21,34 @@ PI2 = 2 * PI
 # other than that you'll hear something that, even if it's not what you
 # desired, will be at least technically "correct".
 
-class Synthesizer:
-    def __init__(self, audio_server):
-        self._server = audio_server
+def str2nparray(str, samplewidth, nframes, nchannels):
+    '''Converts the given string of bytes into a numpy array.
+    str - the string to be converted
+    samplewidth - sample width in bytes
+    nframes - number of frames
+    nchannels - number of channels
+    '''
+    types = {2:'h', 4:'i', 8:'l'}
+    format = '>' + "{0}".format(nframes * nchannels) + types.get(samplewidth)
+    samples = struct.unpack(format, str)
+    res = numpy.asarray(samples, numpy.float32)
 
-    def sine(self, freq, dur):
-        return numpy.sin(PI2 * freq * 
-                         numpy.linspace(0, dur * RATE, dur * RATE))
+    scalar = max(numpy.max(res), -numpy.min(res))
+    if abs(scalar) < 1e-12:
+        return res
+
+    return res / scalar
+
+
+def load_sample(path):
+    f = aifc.open(path, 'r')
+    result = f.readframes(f.getnframes())
+    f.close()
+    return str2nparray(result, f.getsampwidth(), f.getnframes(),
+                       f.getnchannels())
+
+def sine(freq, dur):
+    return numpy.sin(PI2 * freq * numpy.linspace(0, dur * RATE, dur * RATE))
 
 class RingBuffer:
     def __init__(self, buf, end):
@@ -34,8 +56,6 @@ class RingBuffer:
         self.buf = buf
 
     def next_frames(self, frames):
-        if frames is None: return
-
         start = self.end
         end = (self.end + frames) % len(self.buf)
         self.end = end
