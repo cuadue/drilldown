@@ -38,7 +38,7 @@ def str2nparray(s, samplewidth, nframes, nchannels, endianness):
     return res / (scalar if abs(scalar) > 1e-12 else 1)
 
 def _load_sample(path, mod, endianness):
-    f = wave.open(path, 'r')
+    f = mod.open(path, 'r')
     result = f.readframes(f.getnframes())
     f.close()
     return str2nparray(result, f.getsampwidth(), f.getnframes(),
