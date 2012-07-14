@@ -15,8 +15,6 @@ def norm_smooth(buf):
     if abs(scalar) < 1e-12:
         return buf
 
-    print scalar
-
     res /= scalar
     res[0:10] *= smooth_start
     res[-10:] *= smooth_end

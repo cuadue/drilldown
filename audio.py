@@ -3,8 +3,8 @@ import Queue
 import time
 import pyaudio
 import numpy
-import aifc
-import struct
+
+import aifc, wave, struct
 
 STREAM_BUF_SIZE = 512
 CHANNELS = 1
@@ -21,31 +21,34 @@ PI2 = 2 * PI
 # other than that you'll hear something that, even if it's not what you
 # desired, will be at least technically "correct".
 
-def str2nparray(str, samplewidth, nframes, nchannels):
-    '''Converts the given string of bytes into a numpy array.
-    str - the string to be converted
-    samplewidth - sample width in bytes
-    nframes - number of frames
-    nchannels - number of channels
-    '''
+def str2nparray(s, samplewidth, nframes, nchannels, endianness):
+    ''' Converts the given string of bytes into a numpy array.
+        str - the string to be converted
+        samplewidth - sample width in bytes
+        nframes - number of frames
+        nchannels - number of channels '''
+
     types = {2:'h', 4:'i', 8:'l'}
-    format = '>' + "{0}".format(nframes * nchannels) + types.get(samplewidth)
-    samples = struct.unpack(format, str)
+    fmt = endianness + ("{0}".format(nframes * nchannels) + 
+                    types.get(samplewidth))
+    samples = struct.unpack(fmt, s)
     res = numpy.asarray(samples, numpy.float32)
 
     scalar = max(numpy.max(res), -numpy.min(res))
-    if abs(scalar) < 1e-12:
-        return res
+    return res / (scalar if abs(scalar) > 1e-12 else 1)
 
-    return res / scalar
-
-
-def load_sample(path):
-    f = aifc.open(path, 'r')
+def _load_sample(path, mod, endianness):
+    f = wave.open(path, 'r')
     result = f.readframes(f.getnframes())
     f.close()
     return str2nparray(result, f.getsampwidth(), f.getnframes(),
-                       f.getnchannels())
+                       f.getnchannels(), endianness=endianness)
+
+def load_wav(path):
+    return _load_sample(path, wave, '>')
+
+def load_wav(path):
+    return _load_sample(path, aifc, '<')
 
 def sine(freq, dur):
     return numpy.sin(PI2 * freq * numpy.linspace(0, dur * RATE, dur * RATE))

@@ -6,7 +6,7 @@ from pymonome import monome
 import audio
 from sequencer import SequencerPage
 
-BPM = 20
+BPM = 5
 ROWS, COLS = 8, 8
 DURATIONS, VARIS = 8, 8
 
@@ -74,15 +74,16 @@ class Drilldown(monome.Monome):
 aserver = audio.AudioServer(BPM)
 aserver.start()
 
-instruments = [audio.load_sample('samples/' + p) for p in [
-    '78-BD1.aif',
-    '78-BHI1.aif',
-    '78-BLO1.aif',
-    '78-BME1.aif',
-    '78-CLA1.aif',
-    '78-COW1.aif',
-    '78-GUI1.aif'
-    ]]
+instruments = [audio.load_wav('samples/%d.wav' % p) for p in 
+               range(1, 8)]
+    #'78-BD1.aif',
+    #'78-BHI1.aif',
+    #'78-BLO1.aif',
+    #'78-BME1.aif',
+    #'78-CLA1.aif',
+    #'78-COW1.aif',
+    ##'78-GUI1.aif'
+    #]]
 
 app = Drilldown(aserver, instruments, monome.find_any_monome())
 app.start()
