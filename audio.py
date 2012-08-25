@@ -45,9 +45,9 @@ def _load_sample(path, mod, endianness):
                        f.getnchannels(), endianness=endianness)
 
 def load_wav(path):
-    return _load_sample(path, wave, '>')
+    return _load_sample(path, wave, '<')
 
-def load_wav(path):
+def load_aiff(path):
     return _load_sample(path, aifc, '<')
 
 def sine(freq, dur):
