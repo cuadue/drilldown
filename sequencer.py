@@ -3,7 +3,7 @@ import numpy
 smooth_start = numpy.linspace(0, 1, 10)
 smooth_end = numpy.linspace(1, 0, 10)
 
-def norm_smooth(buf):
+def norm_smooth(buf, count=10):
     ''' Normalizes the buffer to unity. Offsets to 0 RMS, and applies
         a smoothing to the front and end of the buffer as a primitive
         pop-supression '''
@@ -12,12 +12,13 @@ def norm_smooth(buf):
     res[:] = buf - numpy.sqrt(numpy.mean(buf * buf))
 
     scalar = max(numpy.max(res), -numpy.min(res))
+    # numpy doesn't raise on a divide-by-zero, only warns and produces nan's
     if abs(scalar) < 1e-12:
         return buf
 
     res /= scalar
-    res[0:10] *= smooth_start
-    res[-10:] *= smooth_end
+    res[0:count] *= smooth_start
+    res[-count:] *= smooth_end
     return res
 
 class SequencerPage:
@@ -43,7 +44,7 @@ class SequencerPage:
         instrval = val >> 3
         self.state[col] = (refval, instrval)
 
-        # BIG TODO
+        # BIG TODO: Something or another
 
     def __put_chunk(self, col, chunk):
         if chunk is None: return
