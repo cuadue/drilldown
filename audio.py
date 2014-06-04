@@ -67,6 +67,7 @@ class RingBuffer:
         else:
             result = self.buf[start:end]
 
+        # If this assertion fails, Bad Things (tm) will happen to your ears.
         assert(len(result) == frames)
         return result
 
@@ -89,28 +90,27 @@ class AudioServer(threading.Thread):
                         rate = RATE,
                         output = True,
                         frames_per_buffer = STREAM_BUF_SIZE)
-        try:
-            __buf = None
-            while True:
-                try:
-                    __buf = RingBuffer(self.buf_queue.get_nowait(), 
-                                       __buf.end if __buf else 0)
-                except Queue.Empty:
-                    pass
 
-                if __buf is None:
-                    time.sleep(0.001)
-                    continue
+        __buf = None
+        while True:
+            try:
+                # Fetch the newest loop if one exists in the queue.  We can't
+                # wait for another sample to be available because the actual
+                # audio server is hungry and we have to keep it well fed
+                samples = self.buf_queue.get_nowait()
+                __buf = RingBuffer(samples, __buf.end if __buf else 0)
+            except Queue.Empty:
+                pass
 
+            if __buf is None:
+                # But if we have nothing to feed the buffer, then we must wait
+                # for some hapless prey to fall into it's gaping trap
+                time.sleep(0.001)
+            else:
                 # We want to keep the buffer full at all times to trade one
                 # kind of latency for another: faster response from user to
                 # buffer, slower from buffer to output
                 chunk = __buf.next_frames(stream.get_write_available())
                 if chunk is not None:
                     stream.write(chunk.astype(numpy.float32).tostring())
-        finally:
-            pass
-            #stream.stop_stream()
-            #stream.close()
-            #p.terminate()
 
