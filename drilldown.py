@@ -13,9 +13,7 @@ DURATIONS, VARIS = 8, 8
 class Drilldown(monome.Monome):
     def __init__(self, audio_server, instruments, address):
         monome.Monome.__init__(self, address)
-        self.state = [[[0 for n in range(COLS)] 
-                            for v in range(VARIS)]
-                                for d in range(DURATIONS)]
+        self.state = [[[0] * COLS] * VARIS] * DURATIONS
 
         self.aserver = audio_server
         self.selected_dur = 0
@@ -25,7 +23,6 @@ class Drilldown(monome.Monome):
                         for v in range(VARIS)] 
                           for d in range(DURATIONS)]
 
-        # The minus one is because the last page has no references to next
         for i in range(DURATIONS):
             bufsize = int(audio.RATE * 60 / BPM / (2 ** (3 * i)))
             # Kind of annoying to have a second init routine: this data
@@ -55,14 +52,10 @@ class Drilldown(monome.Monome):
             # We consume the first two bits for page and state selection.
             page.update(x, state[x])
 
-        try:
-            self.aserver.write_buf(self.root_page.render(force=True))
-        except:
-            import traceback
-            traceback.print_exc()
+        self.aserver.write_buf(self.root_page.render(force=True))
 
-        # Update LED state
-        # We store state in column-major order so we have to transpose into
+        # Update LED state.
+        # State is stored in in column-major order so we have to transpose into
         # row-major order to suit /grid/led/map
         m = ([1 << self.selected_dur, 1 << self.selected_var] + 
                             [sum(((col >> nrow) & 1) << ncol 
@@ -74,16 +67,7 @@ class Drilldown(monome.Monome):
 aserver = audio.AudioServer(BPM)
 aserver.start()
 
-instruments = [audio.load_wav('samples/%d.wav' % p) for p in 
-               range(1, 8)]
-    #'78-BD1.aif',
-    #'78-BHI1.aif',
-    #'78-BLO1.aif',
-    #'78-BME1.aif',
-    #'78-CLA1.aif',
-    #'78-COW1.aif',
-    ##'78-GUI1.aif'
-    #]]
+instruments = [audio.load_wav('samples/%d.wav' % p) for p in range(1, 8)]
 
 app = Drilldown(aserver, instruments, monome.find_any_monome())
 app.start()
